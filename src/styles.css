@@ -1,1 +1,40 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+
+/* A4横 1ページ前提の“用紙”サイズ（mmで固定） */
+.sheet {
+  width: 297mm;
+  height: 210mm;
+  padding: 10mm;
+  overflow: hidden;
+}
+
+/* 2段の各パネルは高さを均等にし、枠内に収める */
+.panel {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0; /* grid内で子がはみ出すのを抑える */
+}
+
+@media print {
+  /* 印刷用紙をA4横に固定（ブラウザ依存あり） */
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  html, body {
+    height: auto;
+  }
+
+  /* 画面用の背景や余白を印刷時に消す */
+  body {
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 印刷時は用紙を左上基準に */
+  .sheet {
+    box-shadow: none;
+  }
+}
