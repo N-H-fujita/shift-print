@@ -87,7 +87,7 @@ export function PrintPage() {
 
   return (
     <main className="mx-auto w-fit">
-      <section className="sheet bg-white text-black shadow print:shadow-none">
+      <section className="sheet flex flex-col bg-white text-black shadow print:shadow-none">
         <header className="flex items-end justify-between border-b border-neutral-300 pb-2">
           <div>
             <h1 className="text-lg font-bold">シフト表印刷ツール</h1>
@@ -98,7 +98,6 @@ export function PrintPage() {
             <div>data: {data ? JSON.stringify(data) : "null"}</div>
           </div>
         </header>
-
         <div className="mt-3 grid grid-rows-2 gap-3">
           <section className="panel">
             <PanelTitle>上段（1〜15日）</PanelTitle>
@@ -145,7 +144,7 @@ function DayCell({ day, weekday }: { day: number; weekday: string }) {
   const isSaturday = weekday === "土";
 
   return (
-    <div className="rounded border border-neutral-200 bg-neutral-50 p-1 text-[10px] text-neutral-700">
+    <div className="flex h-full flex-col rounded border border-neutral-200 bg-neutral-50 p-1 text-[9px] leading-tight text-neutral-700">
       <div className="flex items-center justify-between">
         <span className="font-semibold">{day}</span>
         <span className={isSunday ? "text-red-600" : isSaturday ? "text-blue-600" : ""}>
@@ -153,7 +152,7 @@ function DayCell({ day, weekday }: { day: number; weekday: string }) {
         </span>
       </div>
       {/* ここに後で「人×シフト」を入れる想定 */}
-      <div className="mt-1 h-6 rounded border border-neutral-200 bg-white" />
+      <div className="mt-1 flex-1 rounded border border-neutral-200 bg-white" />
     </div>
   );
 }

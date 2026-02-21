@@ -13,6 +13,7 @@
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 0; /* grid内で子がはみ出すのを抑える */
+  overflow: hidden;
 }
 
 @media print {
@@ -35,6 +36,9 @@
 
   /* 印刷時は用紙を左上基準に */
   .sheet {
-    box-shadow: none;
+    width: 297mm;
+    height: 210mm;
+    padding: 10mm;
+    overflow: hidden; /* 念のため固定 */
   }
 }
