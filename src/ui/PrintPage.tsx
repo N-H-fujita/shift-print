@@ -1,4 +1,6 @@
 import React from "react";
+import { SHIFT_ROWS, type ShiftKey } from "../core/shiftRows";
+import { pickMemberByDayOffset } from "../core/rotationTemp";
 
 type ShiftData = {
   version?: number;
@@ -41,17 +43,6 @@ const MEMBERS = [
   "山本", "中村", "小林",
   "加藤", "吉田"
 ];
-
-const SHIFT_ROWS = [
-  { key: "early", label: "早番" },
-  { key: "late", label: "遅番" },
-  { key: "trip", label: "出張" },
-  { key: "off1", label: "休み①" },
-  { key: "off2", label: "休み②" },
-  { key: "off3", label: "休み③" },
-] as const;
-
-type ShiftKey = (typeof SHIFT_ROWS)[number]["key"];
 
 // ==========================
 
@@ -189,30 +180,12 @@ function ShiftTableLinear({
   );
 }
 
-function mod(n: number, m: number) {
-  return ((n % m) + m) % m;
-}
-
 function ShiftCellLinear({ day, shiftKey }: { day: number; shiftKey: ShiftKey }) {
-  const n = MEMBERS.length;
-
-  // 「その日に出張する人」を基準にしたオフセット（ダミー）
-  // trip: day
-  // off1: tripの翌日 → day-1 のtrip
-  // off2: day-2 のtrip
-  // off3: day-3 のtrip
-  // late: tripの3日前 → day+3 のtrip
-  // early: lateの3日前 → day+6 のtrip
-  const offsetByKey: Record<ShiftKey, number> = {
-    trip: 0,
-    off1: -1,
-    off2: -2,
-    off3: -3,
-    late: +3,
-    early: +6,
-  };
-
-  const picked = MEMBERS[mod(day + offsetByKey[shiftKey], n)];
+  const picked = pickMemberByDayOffset({
+    day,
+    shiftKey,
+    members: MEMBERS,
+  });
 
   const isOff = shiftKey.startsWith("off");
   const isTrip = shiftKey === "trip";
@@ -221,9 +194,7 @@ function ShiftCellLinear({ day, shiftKey }: { day: number; shiftKey: ShiftKey })
     <div
       className={[
         "border-b border-neutral-200 px-1 py-0 text-lg font-medium leading-tight",
-        isTrip ? "bg-blue-50"
-        : isOff ? "bg-neutral-50"
-        : "bg-white",
+        isTrip ? "bg-blue-50" : isOff ? "bg-neutral-50" : "bg-white",
       ].join(" ")}
     >
       <div className="truncate w-full text-center">{picked}</div>
