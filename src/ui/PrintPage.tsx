@@ -6,6 +6,7 @@ type ShiftData = {
 };
 
 function readShiftData(): ShiftData | null {
+  // data.js は window.SHIFT_DATA を想定（無い場合は null）
   const w = window as unknown as { SHIFT_DATA?: unknown };
   if (!("SHIFT_DATA" in w)) return null;
   return (w.SHIFT_DATA as ShiftData) ?? null;
@@ -33,43 +34,31 @@ function getDaysInMonth(year: number, monthIndex0: number): number {
   return new Date(year, monthIndex0 + 1, 0).getDate();
 }
 
-function createDate(year: number, monthIndex0: number, day: number): Date {
-  return new Date(year, monthIndex0, day);
-}
+// ===== UI確認用のダミー =====
+const MEMBERS = [
+  "田中", "佐藤", "鈴木",
+  "高橋", "伊藤", "渡辺",
+  "山本", "中村", "小林",
+  "加藤", "吉田"
+];
 
-type DayCellModel =
-  | { kind: "blank" }
-  | { kind: "day"; date: Date; day: number; weekday: (typeof WEEKDAYS_JA)[number] };
+const SHIFT_ROWS = [
+  { key: "early", label: "早番" },
+  { key: "late", label: "遅番" },
+  { key: "trip", label: "出張" },
+  { key: "off1", label: "休み①" },
+  { key: "off2", label: "休み②" },
+  { key: "off3", label: "休み③" },
+] as const;
 
-function buildMonthGrid(year: number, monthIndex0: number, startDay: number, endDay: number): DayCellModel[] {
-  const startDate = createDate(year, monthIndex0, startDay);
-  const startDow = startDate.getDay(); // 0..6
+type ShiftKey = (typeof SHIFT_ROWS)[number]["key"];
 
-  const cells: DayCellModel[] = [];
-
-  // 先頭の曜日に合わせて空セル
-  for (let i = 0; i < startDow; i++) cells.push({ kind: "blank" });
-
-  for (let day = startDay; day <= endDay; day++) {
-    const d = createDate(year, monthIndex0, day);
-    cells.push({
-      kind: "day",
-      date: d,
-      day,
-      weekday: WEEKDAYS_JA[d.getDay()],
-    });
-  }
-
-  // 末尾も7の倍数に揃える（見た目の整列用）
-  while (cells.length % 7 !== 0) cells.push({ kind: "blank" });
-
-  return cells;
-}
+// ==========================
 
 export function PrintPage() {
   const now = new Date();
   const year = now.getFullYear();
-  const monthIndex0 = now.getMonth(); // 0..11
+  const monthIndex0 = now.getMonth();
   const daysInMonth = getDaysInMonth(year, monthIndex0);
 
   const monthLabel = formatMonthLabel(now);
@@ -78,35 +67,51 @@ export function PrintPage() {
 
   const topStart = 1;
   const topEnd = Math.min(15, daysInMonth);
+
   const bottomStart = Math.min(16, daysInMonth + 1);
   const bottomEnd = daysInMonth;
 
-  const topCells = buildMonthGrid(year, monthIndex0, topStart, topEnd);
-  const bottomCells =
-    bottomStart <= bottomEnd ? buildMonthGrid(year, monthIndex0, bottomStart, bottomEnd) : [];
-
   return (
     <main className="mx-auto w-fit">
+      {/* “用紙” */}
       <section className="sheet flex flex-col bg-white text-black shadow print:shadow-none">
+        {/* ヘッダー */}
         <header className="flex items-end justify-between border-b border-neutral-300 pb-2">
           <div>
             <h1 className="text-lg font-bold">シフト表印刷ツール</h1>
             <p className="text-sm text-neutral-700">対象月: {monthLabel}</p>
           </div>
+
           <div className="text-right text-xs text-neutral-600">
             <div>印刷: {printedAt}</div>
             <div>data: {data ? JSON.stringify(data) : "null"}</div>
           </div>
         </header>
-        <div className="mt-3 grid grid-rows-2 gap-3">
-          <section className="panel">
-            <PanelTitle>上段（1〜15日）</PanelTitle>
-            <CalendarGrid cells={topCells} />
+
+        {/* 2段（上段 / 下段） */}
+        <div className="mt-2 grid flex-1 grid-rows-2 gap-1 overflow-hidden">
+          <section className="panel min-h-0">
+            <ShiftTableLinear
+              year={year}
+              monthIndex0={monthIndex0}
+              startDay={topStart}
+              endDay={topEnd}
+            />
           </section>
 
-          <section className="panel">
-            <PanelTitle>下段（16日〜月末）</PanelTitle>
-            <CalendarGrid cells={bottomCells} />
+          <section className="panel min-h-0">
+            {bottomStart <= bottomEnd ? (
+              <ShiftTableLinear
+                year={year}
+                monthIndex0={monthIndex0}
+                startDay={bottomStart}
+                endDay={bottomEnd}
+              />
+            ) : (
+              <div className="h-full rounded border border-neutral-300 p-2 text-sm text-neutral-600">
+                （この月は下段がありません）
+              </div>
+            )}
           </section>
         </div>
       </section>
@@ -114,45 +119,114 @@ export function PrintPage() {
   );
 }
 
-function PanelTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-2 flex items-center justify-between">
-      <h2 className="text-sm font-semibold text-neutral-800">{children}</h2>
-      <span className="text-[11px] text-neutral-500">（月日数に自動対応）</span>
-    </div>
-  );
-}
+/**
+ * 1〜15 / 16〜末日 を「横一列」で並べる表
+ * - 左列：早番/遅番/休み（固定）
+ * - 上段：日付+曜日（ヘッダ）
+ * - 本体：各セルに該当メンバー名（いまはダミー）
+ */
+function ShiftTableLinear({
+  year,
+  monthIndex0,
+  startDay,
+  endDay,
+}: {
+  year: number;
+  monthIndex0: number;
+  startDay: number;
+  endDay: number;
+}) {
+  const days = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
+  const colCount = days.length;
 
-function CalendarGrid({ cells }: { cells: DayCellModel[] }) {
   return (
-    <div className="h-full rounded border border-neutral-300 p-2">
-      <div className="grid h-full grid-cols-7 gap-1">
-        {cells.map((cell, idx) =>
-          cell.kind === "blank" ? (
-            <div key={idx} className="rounded border border-transparent p-1" />
-          ) : (
-            <DayCell key={idx} day={cell.day} weekday={cell.weekday} />
-          )
-        )}
+    <div className="h-full rounded border border-neutral-300 p-0">
+      {/* 左見出し + 日付列（colCount） */}
+      <div
+        className="grid h-full border border-neutral-200"
+        style={{ gridTemplateColumns: `18mm repeat(${colCount}, minmax(0, 1fr))` }}
+      >
+        {/* 左上（空） */}
+        <div className="border-b border-r border-neutral-200 bg-neutral-100" />
+
+        {/* 日付ヘッダー */}
+        {days.map((day) => {
+          const dow = WEEKDAYS_JA[new Date(year, monthIndex0, day).getDay()];
+          const isSun = dow === "日";
+          const isSat = dow === "土";
+
+          return (
+            <div
+              key={day}
+              className="border-b border-neutral-200 bg-neutral-100 px-0.5 py-0 text-lg leading-none"
+            >
+              <div className="flex flex-col items-center justify-center">
+                <span className="font-semibold leading-none">{day}</span>
+                <span className={isSun ? "text-red-600" : isSat ? "text-blue-600" : "text-neutral-600"}>
+                  {dow}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* 本体：早番/遅番/休み の3行 */}
+        {SHIFT_ROWS.map((row) => (
+          <React.Fragment key={row.key}>
+            {/* 左：行見出し */}
+            <div className="border-r border-b border-neutral-200 bg-white px-0.5 py-0 text-xl font-bold text-center leading-none">
+              {row.label}
+            </div>
+
+            {/* 右：日付セル */}
+            {days.map((day) => (
+              <ShiftCellLinear key={`${row.key}-${day}`} day={day} shiftKey={row.key} />
+            ))}
+          </React.Fragment>
+        ))}
       </div>
     </div>
   );
 }
 
-function DayCell({ day, weekday }: { day: number; weekday: string }) {
-  const isSunday = weekday === "日";
-  const isSaturday = weekday === "土";
+function mod(n: number, m: number) {
+  return ((n % m) + m) % m;
+}
+
+function ShiftCellLinear({ day, shiftKey }: { day: number; shiftKey: ShiftKey }) {
+  const n = MEMBERS.length;
+
+  // 「その日に出張する人」を基準にしたオフセット（ダミー）
+  // trip: day
+  // off1: tripの翌日 → day-1 のtrip
+  // off2: day-2 のtrip
+  // off3: day-3 のtrip
+  // late: tripの3日前 → day+3 のtrip
+  // early: lateの3日前 → day+6 のtrip
+  const offsetByKey: Record<ShiftKey, number> = {
+    trip: 0,
+    off1: -1,
+    off2: -2,
+    off3: -3,
+    late: +3,
+    early: +6,
+  };
+
+  const picked = MEMBERS[mod(day + offsetByKey[shiftKey], n)];
+
+  const isOff = shiftKey.startsWith("off");
+  const isTrip = shiftKey === "trip";
 
   return (
-    <div className="flex h-full flex-col rounded border border-neutral-200 bg-neutral-50 p-1 text-[9px] leading-tight text-neutral-700">
-      <div className="flex items-center justify-between">
-        <span className="font-semibold">{day}</span>
-        <span className={isSunday ? "text-red-600" : isSaturday ? "text-blue-600" : ""}>
-          {weekday}
-        </span>
-      </div>
-      {/* ここに後で「人×シフト」を入れる想定 */}
-      <div className="mt-1 flex-1 rounded border border-neutral-200 bg-white" />
+    <div
+      className={[
+        "border-b border-neutral-200 px-1 py-0 text-lg font-medium leading-tight",
+        isTrip ? "bg-blue-50"
+        : isOff ? "bg-neutral-50"
+        : "bg-white",
+      ].join(" ")}
+    >
+      <div className="truncate w-full text-center">{picked}</div>
     </div>
   );
 }
