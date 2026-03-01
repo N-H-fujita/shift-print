@@ -1,17 +1,13 @@
 import React from "react";
 import { SHIFT_ROWS, type ShiftKey } from "../core/shiftRows";
 import { pickMemberByDayOffset } from "../core/rotationTemp";
+import { isShiftDataV1, type ShiftDataV1 } from "../core/shiftData";
 
-type ShiftData = {
-  version?: number;
-  note?: string;
-};
-
-function readShiftData(): ShiftData | null {
-  // data.js は window.SHIFT_DATA を想定（無い場合は null）
+// readShiftData()はそのままでもOKだが、戻り値の型だけ少し強くする
+function readShiftData(): ShiftDataV1 | null {
   const w = window as unknown as { SHIFT_DATA?: unknown };
-  if (!("SHIFT_DATA" in w)) return null;
-  return (w.SHIFT_DATA as ShiftData) ?? null;
+  const raw = w.SHIFT_DATA;
+  return isShiftDataV1(raw) ? raw : null;
 }
 
 const WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"] as const;
@@ -37,12 +33,9 @@ function getDaysInMonth(year: number, monthIndex0: number): number {
 }
 
 // ===== UI確認用のダミー =====
-const MEMBERS = [
-  "田中", "佐藤", "鈴木",
-  "高橋", "伊藤", "渡辺",
-  "山本", "中村", "小林",
-  "加藤", "吉田"
-];
+const FALLBACK_MEMBERS = [
+  "田中","佐藤","鈴木","高橋","伊藤","渡辺","山本","中村","小林","加藤","吉田"
+] as const;
 
 // ==========================
 
@@ -55,6 +48,8 @@ export function PrintPage() {
   const monthLabel = formatMonthLabel(now);
   const printedAt = formatPrintedAt(now);
   const data = readShiftData();
+
+  const members = data?.members?.length ? data.members : [...FALLBACK_MEMBERS];
 
   const topStart = 1;
   const topEnd = Math.min(15, daysInMonth);
@@ -87,6 +82,7 @@ export function PrintPage() {
               monthIndex0={monthIndex0}
               startDay={topStart}
               endDay={topEnd}
+              members={members}
             />
           </section>
 
@@ -97,6 +93,7 @@ export function PrintPage() {
                 monthIndex0={monthIndex0}
                 startDay={bottomStart}
                 endDay={bottomEnd}
+                members={members}
               />
             ) : (
               <div className="h-full rounded border border-neutral-300 p-2 text-sm text-neutral-600">
@@ -121,11 +118,13 @@ function ShiftTableLinear({
   monthIndex0,
   startDay,
   endDay,
+  members,
 }: {
   year: number;
   monthIndex0: number;
   startDay: number;
   endDay: number;
+  members: readonly string[];
 }) {
   const days = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
   const colCount = days.length;
@@ -171,7 +170,12 @@ function ShiftTableLinear({
 
             {/* 右：日付セル */}
             {days.map((day) => (
-              <ShiftCellLinear key={`${row.key}-${day}`} day={day} shiftKey={row.key} />
+              <ShiftCellLinear
+                key={`${row.key}-${day}`}
+                day={day}
+                shiftKey={row.key}
+                members={members}
+              />
             ))}
           </React.Fragment>
         ))}
@@ -180,11 +184,19 @@ function ShiftTableLinear({
   );
 }
 
-function ShiftCellLinear({ day, shiftKey }: { day: number; shiftKey: ShiftKey }) {
+function ShiftCellLinear({
+  day,
+  shiftKey,
+  members
+}: {
+  day: number;
+  shiftKey: ShiftKey;
+  members: readonly string[];
+}) {
   const picked = pickMemberByDayOffset({
     day,
     shiftKey,
-    members: MEMBERS,
+    members,
   });
 
   const isOff = shiftKey.startsWith("off");
