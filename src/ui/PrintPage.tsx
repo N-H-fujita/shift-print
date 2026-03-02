@@ -2,6 +2,7 @@ import React from "react";
 import { SHIFT_ROWS, type ShiftKey } from "../core/shiftRows";
 import { pickMemberByDayOffset } from "../core/rotationTemp";
 import { isShiftDataV1, type ShiftDataV1 } from "../core/shiftData";
+import { pickMember } from "../core/rotationFacade";
 
 // readShiftData()はそのままでもOKだが、戻り値の型だけ少し強くする
 function readShiftData(): ShiftDataV1 | null {
@@ -175,6 +176,8 @@ function ShiftTableLinear({
                 day={day}
                 shiftKey={row.key}
                 members={members}
+                year={year}
+                monthIndex0={monthIndex0}
               />
             ))}
           </React.Fragment>
@@ -187,13 +190,20 @@ function ShiftTableLinear({
 function ShiftCellLinear({
   day,
   shiftKey,
-  members
+  members,
+  year,
+  monthIndex0,
 }: {
   day: number;
   shiftKey: ShiftKey;
   members: readonly string[];
+  year: number;
+  monthIndex0: number;
 }) {
-  const picked = pickMemberByDayOffset({
+  const date = new Date(year, monthIndex0, day);
+  const picked = pickMember({
+    mode: "temp",
+    date,
     day,
     shiftKey,
     members,
