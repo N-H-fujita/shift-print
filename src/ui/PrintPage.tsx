@@ -1,6 +1,5 @@
 import React from "react";
 import { SHIFT_ROWS, type ShiftKey } from "../core/shiftRows";
-import { pickMemberByDayOffset } from "../core/rotationTemp";
 import { isShiftDataV1, type ShiftDataV1 } from "../core/shiftData";
 import { pickMember } from "../core/rotationFacade";
 
@@ -41,15 +40,22 @@ const FALLBACK_MEMBERS = [
 // ==========================
 
 export function PrintPage() {
-  const now = new Date();
+  // const now = new Date();
+  const now = new Date(2026, 5, 1);
   const year = now.getFullYear();
   const monthIndex0 = now.getMonth();
   const daysInMonth = getDaysInMonth(year, monthIndex0);
 
   const monthLabel = formatMonthLabel(now);
   const printedAt = formatPrintedAt(now);
-  const data = readShiftData();
 
+  console.log("[DEBUG] SHIFT_DATA(raw):", (window as any).SHIFT_DATA);
+  console.log("[DEBUG] isShiftDataV1:", isShiftDataV1((window as any).SHIFT_DATA));
+  console.log("[DEBUG] readShiftData:", readShiftData());
+
+  const data = readShiftData();
+  const mode = data?.mode ?? "temp";
+  const anchorDateYmd = data?.anchorDate;
   const members = data?.members?.length ? data.members : [...FALLBACK_MEMBERS];
 
   const topStart = 1;
@@ -84,6 +90,8 @@ export function PrintPage() {
               startDay={topStart}
               endDay={topEnd}
               members={members}
+              mode={mode}
+              anchorDateYmd={anchorDateYmd}
             />
           </section>
 
@@ -95,6 +103,8 @@ export function PrintPage() {
                 startDay={bottomStart}
                 endDay={bottomEnd}
                 members={members}
+                mode={mode}
+                anchorDateYmd={anchorDateYmd}
               />
             ) : (
               <div className="h-full rounded border border-neutral-300 p-2 text-sm text-neutral-600">
@@ -120,12 +130,16 @@ function ShiftTableLinear({
   startDay,
   endDay,
   members,
+  mode,
+  anchorDateYmd,
 }: {
   year: number;
   monthIndex0: number;
   startDay: number;
   endDay: number;
   members: readonly string[];
+  mode: "temp" | "anchor";
+  anchorDateYmd?: string;
 }) {
   const days = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
   const colCount = days.length;
@@ -178,6 +192,8 @@ function ShiftTableLinear({
                 members={members}
                 year={year}
                 monthIndex0={monthIndex0}
+                mode={mode}
+                anchorDateYmd={anchorDateYmd}
               />
             ))}
           </React.Fragment>
@@ -193,20 +209,27 @@ function ShiftCellLinear({
   members,
   year,
   monthIndex0,
+  mode,
+  anchorDateYmd,
 }: {
   day: number;
   shiftKey: ShiftKey;
   members: readonly string[];
   year: number;
   monthIndex0: number;
+  mode: "temp" | "anchor";
+  anchorDateYmd?: string;
 }) {
+  console.log("mode", mode, "anchorDateYmd", anchorDateYmd);
+
   const date = new Date(year, monthIndex0, day);
   const picked = pickMember({
-    mode: "temp",
     date,
     day,
     shiftKey,
     members,
+    mode,
+    anchorDateYmd,
   });
 
   const isOff = shiftKey.startsWith("off");
