@@ -82,6 +82,7 @@ export function PrintPage() {
   const mode = data?.mode ?? "temp";
   const anchorDateYmd = data?.anchorDate;
   const members = data?.members?.length ? data.members : [...FALLBACK_MEMBERS];
+  const highlightName = data?.highlightName;
 
   const rows = normalizeShiftRows(data);
   const offsetFromTripByKey = buildOffsetMap(rows);
@@ -122,6 +123,7 @@ export function PrintPage() {
               anchorDateYmd={anchorDateYmd}
               rows={rows}
               offsetFromTripByKey={offsetFromTripByKey}
+              highlightName={highlightName}
             />
           </section>
 
@@ -137,6 +139,7 @@ export function PrintPage() {
                 anchorDateYmd={anchorDateYmd}
                 rows={rows}
                 offsetFromTripByKey={offsetFromTripByKey}
+                highlightName={highlightName}
               />
             ) : (
               <div className="h-full rounded border border-neutral-300 p-2 text-sm text-neutral-600">
@@ -166,6 +169,7 @@ function ShiftTableLinear({
   anchorDateYmd,
   rows,
   offsetFromTripByKey,
+  highlightName,
 }: {
   year: number;
   monthIndex0: number;
@@ -176,6 +180,7 @@ function ShiftTableLinear({
   anchorDateYmd?: string;
   rows: readonly ShiftRow[];
   offsetFromTripByKey: Record<ShiftKey, number>;
+  highlightName?: string;
 }) {
   const days = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
   const colCount = days.length;
@@ -231,6 +236,7 @@ function ShiftTableLinear({
                 mode={mode}
                 anchorDateYmd={anchorDateYmd}
                 offsetFromTripByKey={offsetFromTripByKey}
+                highlightName={highlightName}
               />
             ))}
           </React.Fragment>
@@ -249,6 +255,7 @@ function ShiftCellLinear({
   mode,
   anchorDateYmd,
   offsetFromTripByKey,
+  highlightName,
 }: {
   day: number;
   shiftKey: ShiftKey;
@@ -258,8 +265,8 @@ function ShiftCellLinear({
   mode: "temp" | "anchor";
   anchorDateYmd?: string;
   offsetFromTripByKey: Record<ShiftKey, number>;
+  highlightName?: string;
 }) {
-  // console.log("mode", mode, "anchorDateYmd", anchorDateYmd);
 
   const date = new Date(year, monthIndex0, day);
   const picked = pickMember({
@@ -274,12 +281,22 @@ function ShiftCellLinear({
 
   const isOff = shiftKey.startsWith("off");
   const isTrip = shiftKey === "trip";
+  const isMine = !!highlightName && picked === highlightName;
+
+  // 背景は “1つだけ” 決める
+  const bgClass = isMine
+    ? (isOff ? "bg-lime-200" : "bg-yellow-200")
+    : (isTrip ? "bg-blue-50" : isOff ? "bg-neutral-50" : "bg-white");
+
+  // 文字色も必要ならここで（背景と同じく “1つだけ”）
+  const textClass = isMine && isOff ? "text-red-600" : "text-black";
 
   return (
     <div
       className={[
         "border-b border-neutral-200 px-1 py-0 text-lg font-medium leading-tight",
-        isTrip ? "bg-blue-50" : isOff ? "bg-neutral-50" : "bg-white",
+        bgClass,
+        textClass,
       ].join(" ")}
     >
       <div className="truncate w-full text-center">{picked}</div>

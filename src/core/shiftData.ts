@@ -3,6 +3,8 @@ import type { ShiftKey } from "./shiftRows";
 export type ShiftDataV1 = {
   version: 1;
 
+  highlightName?: string;
+
   mode?: "temp" | "anchor";
 
   /**
@@ -69,6 +71,9 @@ export function isShiftDataV1(x: unknown): x is ShiftDataV1 {
 
   // rowsが存在するなら配列かチェック
   if (o.rows !== undefined && !Array.isArray(o.rows)) return false;
+
+  // hightlightNameが存在するなら文字列かチェック
+  if (o.highlightName !== undefined && typeof o.highlightName !== "string") return false;
 
   return true;
 }
