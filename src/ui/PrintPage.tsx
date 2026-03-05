@@ -1,7 +1,36 @@
 import React from "react";
-import { SHIFT_ROWS, type ShiftKey } from "../core/shiftRows";
+import { SHIFT_ROWS, type ShiftKey, type ShiftRow } from "../core/shiftRows";
 import { isShiftDataV1, type ShiftDataV1 } from "../core/shiftData";
 import { pickMember } from "../core/rotationFacade";
+
+const SHIFT_KEYS = new Set<ShiftKey>(SHIFT_ROWS.map((r) => r.key));
+
+function normalizeShiftRows(data: ShiftDataV1 | null): readonly ShiftRow[] {
+  const raw = data?.rows;
+  if (!raw || raw.length === 0) return SHIFT_ROWS;
+
+  const parsed: ShiftRow[] = [];
+
+  for (const r of raw) {
+    const key = r?.key;
+    const label = r?.label;
+    const offset = (r as any)?.offsetFromTrip;
+
+    if (typeof key !== "string") continue;
+    if(!SHIFT_KEYS.has(key as ShiftKey)) continue; // 未知のキーは無視
+    if (typeof label !== "string") continue;
+    if (typeof offset !== "number" || !Number.isFinite(offset)) continue;
+
+    parsed.push({ key: key as ShiftKey, label, offsetFromTrip: offset } as ShiftRow);
+  }
+
+  // 全滅したらフォールバック
+  return parsed.length ? (parsed as readonly ShiftRow[]) : SHIFT_ROWS;
+}
+
+function buildOffsetMap(rows: readonly ShiftRow[]): Record<ShiftKey, number> {
+  return Object.fromEntries(rows.map((r) => [r.key, r.offsetFromTrip])) as Record<ShiftKey, number>;
+}
 
 // readShiftData()はそのままでもOKだが、戻り値の型だけ少し強くする
 function readShiftData(): ShiftDataV1 | null {
@@ -49,14 +78,13 @@ export function PrintPage() {
   const monthLabel = formatMonthLabel(now);
   const printedAt = formatPrintedAt(now);
 
-  console.log("[DEBUG] SHIFT_DATA(raw):", (window as any).SHIFT_DATA);
-  console.log("[DEBUG] isShiftDataV1:", isShiftDataV1((window as any).SHIFT_DATA));
-  console.log("[DEBUG] readShiftData:", readShiftData());
-
   const data = readShiftData();
   const mode = data?.mode ?? "temp";
   const anchorDateYmd = data?.anchorDate;
   const members = data?.members?.length ? data.members : [...FALLBACK_MEMBERS];
+
+  const rows = normalizeShiftRows(data);
+  const offsetFromTripByKey = buildOffsetMap(rows);
 
   const topStart = 1;
   const topEnd = Math.min(15, daysInMonth);
@@ -92,6 +120,8 @@ export function PrintPage() {
               members={members}
               mode={mode}
               anchorDateYmd={anchorDateYmd}
+              rows={rows}
+              offsetFromTripByKey={offsetFromTripByKey}
             />
           </section>
 
@@ -105,6 +135,8 @@ export function PrintPage() {
                 members={members}
                 mode={mode}
                 anchorDateYmd={anchorDateYmd}
+                rows={rows}
+                offsetFromTripByKey={offsetFromTripByKey}
               />
             ) : (
               <div className="h-full rounded border border-neutral-300 p-2 text-sm text-neutral-600">
@@ -132,6 +164,8 @@ function ShiftTableLinear({
   members,
   mode,
   anchorDateYmd,
+  rows,
+  offsetFromTripByKey,
 }: {
   year: number;
   monthIndex0: number;
@@ -140,6 +174,8 @@ function ShiftTableLinear({
   members: readonly string[];
   mode: "temp" | "anchor";
   anchorDateYmd?: string;
+  rows: readonly ShiftRow[];
+  offsetFromTripByKey: Record<ShiftKey, number>;
 }) {
   const days = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
   const colCount = days.length;
@@ -176,7 +212,7 @@ function ShiftTableLinear({
         })}
 
         {/* 本体：早番/遅番/休み の3行 */}
-        {SHIFT_ROWS.map((row) => (
+        {rows.map((row) => (
           <React.Fragment key={row.key}>
             {/* 左：行見出し */}
             <div className="border-r border-b border-neutral-200 bg-white px-0.5 py-0 text-xl font-bold text-center leading-none">
@@ -194,6 +230,7 @@ function ShiftTableLinear({
                 monthIndex0={monthIndex0}
                 mode={mode}
                 anchorDateYmd={anchorDateYmd}
+                offsetFromTripByKey={offsetFromTripByKey}
               />
             ))}
           </React.Fragment>
@@ -211,6 +248,7 @@ function ShiftCellLinear({
   monthIndex0,
   mode,
   anchorDateYmd,
+  offsetFromTripByKey,
 }: {
   day: number;
   shiftKey: ShiftKey;
@@ -219,8 +257,9 @@ function ShiftCellLinear({
   monthIndex0: number;
   mode: "temp" | "anchor";
   anchorDateYmd?: string;
+  offsetFromTripByKey: Record<ShiftKey, number>;
 }) {
-  console.log("mode", mode, "anchorDateYmd", anchorDateYmd);
+  // console.log("mode", mode, "anchorDateYmd", anchorDateYmd);
 
   const date = new Date(year, monthIndex0, day);
   const picked = pickMember({
@@ -230,6 +269,7 @@ function ShiftCellLinear({
     members,
     mode,
     anchorDateYmd,
+    offsetFromTripByKey,
   });
 
   const isOff = shiftKey.startsWith("off");

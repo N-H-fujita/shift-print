@@ -11,15 +11,18 @@ export function pickMember(params: {
   shiftKey: ShiftKey;
   members: readonly string[];
   anchorDateYmd?: string; // anchorモードのとき必須
+  offsetFromTripByKey?: Record<ShiftKey, number>;
 }): string {
-  const { mode, date, day, shiftKey, members, anchorDateYmd } = params;
+  const { mode, date, day, shiftKey, members, anchorDateYmd, offsetFromTripByKey } = params;
 
   if (mode === "anchor") {
     if (!anchorDateYmd) return "";
 
-    const offsetMap = Object.fromEntries(
-      SHIFT_ROWS.map((r) => [r.key, r.offsetFromTrip])
-    ) as Record<ShiftKey, number>;
+    const offsetMap =
+      offsetFromTripByKey ??
+      (Object.fromEntries(
+        SHIFT_ROWS.map((row) => [row.key, row.offsetFromTrip])
+      ) as Record<ShiftKey, number>);
 
     return pickMemberByAnchor({
       targetDate: date,
