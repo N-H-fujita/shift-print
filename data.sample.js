@@ -17,5 +17,7 @@ window.SHIFT_DATA = {
     { key: "off1",  label: "休み①", offsetFromTrip: -1 },
     { key: "off2",  label: "休み②", offsetFromTrip: -2 },
     { key: "off3",  label: "休み③", offsetFromTrip: -3 },
-  ]
+  ],
+
+  highlightName: "田中",
 };
