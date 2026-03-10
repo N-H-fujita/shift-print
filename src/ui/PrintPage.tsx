@@ -77,6 +77,8 @@ export function PrintPage() {
   const printedAt = formatPrintedAt(now);
 
   const data = readShiftData();
+  const warnings = collectWarnings(data);
+
   const mode = data?.mode ?? "temp";
   const anchorDateYmd = data?.anchorDate;
   const members = data?.members?.length ? data.members : [...FALLBACK_MEMBERS];
@@ -107,6 +109,17 @@ export function PrintPage() {
             <div>data: {data ? JSON.stringify(data) : "null"}</div>
           </div>
         </header>
+
+        {warnings.length > 0 && (
+          <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 print:hidden">
+            <div className="font-bold">設定エラー / 警告</div>
+            <ul className="mt-1 list-disc pl-5">
+              {warnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* 2段（上段 / 下段） */}
         <div className="mt-2 grid flex-1 grid-rows-2 gap-1 overflow-hidden">
@@ -149,4 +162,36 @@ export function PrintPage() {
       </section>
     </main>
   );
+}
+
+function collectWarnings(data: ShiftDataV1 | null): string[] {
+  const warnings: string[] = [];
+
+  if (!data) {
+    warnings.push("SHIFT_DATA の形式が不正です。data.js を確認してください。");
+    return warnings;
+  }
+
+  if (!data.members || data.members.length === 0) {
+    warnings.push("members が設定されていません。");
+  }
+
+  if (data.mode === "anchor" && !data.anchorDate) {
+    warnings.push('mode が "anchor" のため、anchorDate が必要です。');
+  }
+
+  if (data.rows) {
+    const invalidRows = data.rows.filter((row) => {
+      if (typeof row.key !== "string") return true;
+      if (typeof row.label !== "string") return true;
+      if (typeof row.offsetFromTrip !== "number" || !Number.isFinite(row.offsetFromTrip)) return true;
+      return false;
+    });
+
+    if (invalidRows.length > 0) {
+      warnings.push("rows に不正な定義があります。一部または全部が無視される可能性があります。");
+    }
+  }
+
+  return warnings;
 }
