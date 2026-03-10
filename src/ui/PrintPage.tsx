@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { SHIFT_ROWS, type ShiftKey, type ShiftRow } from "../core/shiftRows";
 import { isShiftDataV1, type ShiftDataV1 } from "../core/shiftData";
 import { ShiftTableLinear } from "./components/ShiftTableLinear";
@@ -59,6 +60,11 @@ function getDaysInMonth(year: number, monthIndex0: number): number {
   return new Date(year, monthIndex0 + 1, 0).getDate();
 }
 
+const MONTH_OPTIONS = [
+  "01", "02", "03", "04", "05", "06",
+  "07", "08", "09", "10", "11", "12"
+] as const;
+
 // ===== UI確認用のダミー =====
 const FALLBACK_MEMBERS = [
   "田中","佐藤","鈴木","高橋","伊藤","渡辺","山本","中村","小林","加藤","吉田"
@@ -67,14 +73,18 @@ const FALLBACK_MEMBERS = [
 // ==========================
 
 export function PrintPage() {
-  // const now = new Date();
-  const now = new Date(2026, 5, 1);
-  const year = now.getFullYear();
-  const monthIndex0 = now.getMonth();
+  const now = new Date();
+
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonthIndex0, setSelectedMonthIndex0] = useState(now.getMonth());
+
+  const year = selectedYear;
+  const monthIndex0 = selectedMonthIndex0;
   const daysInMonth = getDaysInMonth(year, monthIndex0);
 
-  const monthLabel = formatMonthLabel(now);
-  const printedAt = formatPrintedAt(now);
+  const displayDate = new Date(year, monthIndex0, 1);
+  const monthLabel = formatMonthLabel(displayDate);
+  const printedAt = formatPrintedAt(new Date());
 
   const data = readShiftData();
   const warnings = collectWarnings(data);
@@ -93,6 +103,8 @@ export function PrintPage() {
   const bottomStart = Math.min(16, daysInMonth + 1);
   const bottomEnd = daysInMonth;
 
+  const yearOptions = [selectedYear - 1, selectedYear, selectedYear + 1];
+
   return (
     <main className="mx-auto w-fit">
       {/* “用紙” */}
@@ -110,6 +122,40 @@ export function PrintPage() {
           </div>
         </header>
 
+        {/* 年月切り替えUI（印刷時は非表示） */}
+        <div className="mt-2 flex items-end gap-3 print:hidden">
+          <label className="flex flex-col text-sm">
+            <span className="mb-1 text-neutral-700">年</span>
+            <select
+              className="rounded border border-neutral-300 bg-white px-2 py-1"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+            >
+              {yearOptions.map((optionYear) => (
+                <option key={optionYear} value={optionYear}>
+                  {optionYear}年
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col text-sm">
+            <span className="mb-1 text-neutral-700">月</span>
+            <select
+              className="rounded border border-neutral-300 bg-white px-2 py-1"
+              value={selectedMonthIndex0}
+              onChange={(e) => setSelectedMonthIndex0(Number(e.target.value))}
+            >
+              {MONTH_OPTIONS.map((month, index) => (
+                <option key={month} value={index}>
+                  {month}月
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {/* 警告表示 */}
         {warnings.length > 0 && (
           <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 print:hidden">
             <div className="font-bold">設定エラー / 警告</div>
