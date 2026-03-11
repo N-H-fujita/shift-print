@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SHIFT_ROWS, type ShiftKey, type ShiftRow } from "../core/shiftRows";
-import { isShiftDataV1, type ShiftDataV1 } from "../core/shiftData";
+import { isShiftDataV1, validateShiftData, type ShiftDataV1 } from "../core/shiftData";
 import { ShiftTableLinear } from "./components/ShiftTableLinear";
 
 const SHIFT_KEYS = new Set<ShiftKey>(SHIFT_ROWS.map((r) => r.key));
@@ -59,7 +59,9 @@ export function PrintPage() {
   const printedAt = formatPrintedAt(new Date());
 
   const data = readShiftData();
-  const warnings = collectWarnings(data);
+  const validation = validateShiftData(data);
+  const { errors, warnings } = validation;
+  const hasErrors = errors.length > 0;
 
   const mode = data?.mode ?? "temp";
   const anchorDateYmd = data?.anchorDate;
@@ -138,30 +140,30 @@ export function PrintPage() {
           </div>
         )}
 
-        {/* 2段（上段 / 下段） */}
-        <div className="mt-2 grid flex-1 grid-rows-2 gap-1 overflow-hidden">
-          <section className="panel min-h-0">
-            <ShiftTableLinear
-              year={year}
-              monthIndex0={monthIndex0}
-              startDay={topStart}
-              endDay={topEnd}
-              members={members}
-              mode={mode}
-              anchorDateYmd={anchorDateYmd}
-              rows={rows}
-              offsetFromTripByKey={offsetFromTripByKey}
-              highlightName={highlightName}
-            />
-          </section>
+        {errors.length > 0 && (
+          <div className="mt-2 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 print:hidden">
+            <div className="font-bold">設定エラー</div>
+            <ul className="mt-1 list-disc pl-5">
+              {errors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-          <section className="panel min-h-0">
-            {bottomStart <= bottomEnd ? (
+        {/* 2段（上段 / 下段） */}
+        {hasErrors ? (
+          <div className="mt-2 rounded border border-red-300 bg-red-50 px-3 py-4 text-sm text-red-800">
+            設定エラーがあるため、シフト表を表示できません。data.js を確認してください。
+          </div>
+        ) : (
+          <div className="mt-2 grid flex-1 grid-rows-2 gap-1 overflow-hidden">
+            <section className="panel min-h-0">
               <ShiftTableLinear
                 year={year}
                 monthIndex0={monthIndex0}
-                startDay={bottomStart}
-                endDay={bottomEnd}
+                startDay={topStart}
+                endDay={topEnd}
                 members={members}
                 mode={mode}
                 anchorDateYmd={anchorDateYmd}
@@ -169,13 +171,30 @@ export function PrintPage() {
                 offsetFromTripByKey={offsetFromTripByKey}
                 highlightName={highlightName}
               />
-            ) : (
-              <div className="h-full rounded border border-neutral-300 p-2 text-sm text-neutral-600">
-                （この月は下段がありません）
-              </div>
-            )}
-          </section>
-        </div>
+            </section>
+
+            <section className="panel min-h-0">
+              {bottomStart <= bottomEnd ? (
+                <ShiftTableLinear
+                  year={year}
+                  monthIndex0={monthIndex0}
+                  startDay={bottomStart}
+                  endDay={bottomEnd}
+                  members={members}
+                  mode={mode}
+                  anchorDateYmd={anchorDateYmd}
+                  rows={rows}
+                  offsetFromTripByKey={offsetFromTripByKey}
+                  highlightName={highlightName}
+                />
+              ) : (
+                <div className="h-full rounded border border-neutral-300 p-2 text-sm text-neutral-600">
+                  （この月は下段がありません）
+                </div>
+              )}
+            </section>
+          </div>
+        )}
       </section>
     </main>
   );
@@ -208,34 +227,3 @@ function buildOffsetMap(rows: readonly ShiftRow[]): Record<ShiftKey, number> {
   return Object.fromEntries(rows.map((r) => [r.key, r.offsetFromTrip])) as Record<ShiftKey, number>;
 }
 
-function collectWarnings(data: ShiftDataV1 | null): string[] {
-  const warnings: string[] = [];
-
-  if (!data) {
-    warnings.push("SHIFT_DATA の形式が不正です。data.js を確認してください。");
-    return warnings;
-  }
-
-  if (!data.members || data.members.length === 0) {
-    warnings.push("members が設定されていません。");
-  }
-
-  if (data.mode === "anchor" && !data.anchorDate) {
-    warnings.push('mode が "anchor" のため、anchorDate が必要です。');
-  }
-
-  if (data.rows) {
-    const invalidRows = data.rows.filter((row) => {
-      if (typeof row.key !== "string") return true;
-      if (typeof row.label !== "string") return true;
-      if (typeof row.offsetFromTrip !== "number" || !Number.isFinite(row.offsetFromTrip)) return true;
-      return false;
-    });
-
-    if (invalidRows.length > 0) {
-      warnings.push("rows に不正な定義があります。一部または全部が無視される可能性があります。");
-    }
-  }
-
-  return warnings;
-}

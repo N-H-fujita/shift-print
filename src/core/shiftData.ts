@@ -43,6 +43,11 @@ export type ShiftDataV1 = {
   }>;
 };
 
+export type ValidationResult = {
+  errors: string[];
+  warnings: string[];
+};
+
 /**
  * type guard（壊れてても落とさない用）
  *
@@ -72,8 +77,140 @@ export function isShiftDataV1(x: unknown): x is ShiftDataV1 {
   // rowsが存在するなら配列かチェック
   if (o.rows !== undefined && !Array.isArray(o.rows)) return false;
 
-  // hightlightNameが存在するなら文字列かチェック
+  // highlightNameが存在するなら文字列かチェック
   if (o.highlightName !== undefined && typeof o.highlightName !== "string") return false;
 
   return true;
+}
+
+const KNOWN_SHIFT_KEYS = new Set<string>([
+  "early",
+  "late",
+  "trip",
+  "off1",
+  "off2",
+  "off3",
+]);
+
+function isYmdFormat(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+export function validateShiftData(data: ShiftDataV1 | null): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!data) {
+    errors.push("SHIFT_DATA の形式が不正です。data.js を確認してください。");
+    return { errors, warnings };
+  }
+
+  // members
+  if (!data.members || data.members.length === 0) {
+    errors.push("members が設定されていません。1名以上設定してください。");
+  } else {
+    const normalizedMembers = data.members
+      .filter((name) => typeof name === "string")
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+
+    if (normalizedMembers.length === 0) {
+      errors.push("members が空です。1名以上設定してください。");
+    }
+
+    if (normalizedMembers.length !== data.members.length) {
+      warnings.push("members に空文字または不正な値が含まれています。");
+    }
+
+    const memberSet = new Set(normalizedMembers);
+    if (memberSet.size !== normalizedMembers.length) {
+      warnings.push("members に重複があります。");
+    }
+
+    if (
+      data.highlightName &&
+      !normalizedMembers.includes(data.highlightName.trim())
+    ) {
+      warnings.push("highlightName が members に存在しません。");
+    }
+  }
+
+  // mode / anchorDate
+  const mode = data.mode ?? "temp";
+  if (mode === "anchor") {
+    if (!data.anchorDate) {
+      errors.push('mode が "anchor" のため、anchorDate が必要です。');
+    } else if (!isYmdFormat(data.anchorDate)) {
+      errors.push('anchorDate は "YYYY-MM-DD" 形式で指定してください。');
+    }
+  } else if (data.anchorDate && !isYmdFormat(data.anchorDate)) {
+    warnings.push('anchorDate は "YYYY-MM-DD" 形式推奨です。');
+  }
+
+  // rows
+  if (data.rows && data.rows.length > 0) {
+    let validRowCount = 0;
+    let invalidStructureFound = false;
+    let unknownKeyFound = false;
+
+    const keyList: string[] = [];
+    const offsetList: number[] = [];
+
+    for (const row of data.rows) {
+      const key = row?.key;
+      const label = row?.label;
+      const offset = row?.offsetFromTrip;
+
+      const hasValidStructure =
+        typeof key === "string" &&
+        typeof label === "string" &&
+        typeof offset === "number" &&
+        Number.isFinite(offset);
+
+      if (!hasValidStructure) {
+        invalidStructureFound = true;
+        continue;
+      }
+
+      validRowCount += 1;
+      keyList.push(key);
+      offsetList.push(offset);
+
+      if (!KNOWN_SHIFT_KEYS.has(key)) {
+        unknownKeyFound = true;
+      }
+
+      if (label.trim().length === 0) {
+        warnings.push(`rows の label が空です: key="${key}"`);
+      }
+    }
+
+    if (invalidStructureFound) {
+      warnings.push("rows に不正な定義があります。一部の行は無視されます。");
+    }
+
+    if (unknownKeyFound) {
+      warnings.push("rows に未対応の key があります。現在のUIでは無視されます。");
+    }
+
+    if (validRowCount === 0) {
+      errors.push("rows がすべて不正です。表示に使用できる行定義がありません。");
+    }
+
+    const uniqueKeys = new Set(keyList);
+    if (uniqueKeys.size !== keyList.length) {
+      warnings.push("rows に key の重複があります。");
+    }
+
+    const uniqueOffsets = new Set(offsetList);
+    if (uniqueOffsets.size !== offsetList.length) {
+      warnings.push("rows に offsetFromTrip の重複があります。");
+    }
+
+    if (!keyList.includes("trip")) {
+      warnings.push('rows に "trip" がありません。意図したローテーションにならない可能性があります。');
+    }
+  }
+
+  return { errors, warnings };
 }
