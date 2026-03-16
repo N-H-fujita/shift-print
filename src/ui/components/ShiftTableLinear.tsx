@@ -1,6 +1,7 @@
 import React from "react";
 import type { ShiftKey, ShiftRow } from "../../core/shiftRows";
 import { ShiftCellLinear } from "../components/ShiftCellLinear";
+import { pickMember } from "../../core/rotationFacade";
 
 const WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
@@ -40,6 +41,39 @@ export function ShiftTableLinear({
   const days = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
   const colCount = days.length;
 
+  const getHeaderBgClass = (day: number) => {
+    if (!highlightName) return "bg-neutral-100";
+
+    const date = new Date(year, monthIndex0, day);
+
+    let hasMineOnOff = false;
+    let hasMineOnWork = false;
+
+    for (const row of rows) {
+      const member = pickMember({
+        date,
+        day,
+        shiftKey: row.key,
+        members,
+        mode,
+        anchorDateYmd,
+        offsetFromTripByKey,
+      });
+
+      if (member !== highlightName) continue;
+
+      if (row.key.startsWith("off")) {
+        hasMineOnOff = true;
+      } else {
+        hasMineOnWork = true;
+      }
+    }
+
+    if (hasMineOnWork) return "bg-yellow-200";
+    if (hasMineOnOff) return "bg-lime-200";
+    return "bg-neutral-100";
+  };
+
   return (
     <div className="h-full rounded border border-neutral-300 p-0">
       {/* 左見出し + 日付列（colCount） */}
@@ -55,11 +89,15 @@ export function ShiftTableLinear({
           const dow = getDayOfWeekJa(year, monthIndex0, day);
           const isSun = dow === "日";
           const isSat = dow === "土";
+          const headerBgClass = getHeaderBgClass(day);
 
           return (
             <div
               key={day}
-              className="border-b border-neutral-200 bg-neutral-100 px-0.5 py-0 text-lg leading-none"
+              className={[
+                "border-b border-neutral-200 px-0.5 py-0 text-lg leading-none",
+                headerBgClass,
+              ].join(" ")}
             >
               <div className="flex flex-col items-center justify-center">
                 <span className="font-semibold leading-none">{day}</span>
