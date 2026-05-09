@@ -55,6 +55,16 @@ describe("calcRotationIndexByAnchor", () => {
 
     expect(result).toBe(1);
   });
+
+  it("ローカル日付オブジェクトでも日付がズレずに計算される", () => {
+    const result = calcRotationIndexByAnchor({
+      targetDate: new Date("2026-05-01T00:00:00+09:00"),
+      anchorDateYmd: "2026-05-01",
+      peopleCount: 3,
+    });
+
+    expect(result).toBe(0);
+  });
 });
 
 describe("pickMemberByAnchor", () => {

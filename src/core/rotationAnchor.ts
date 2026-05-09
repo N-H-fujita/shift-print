@@ -16,9 +16,9 @@ export function calcRotationIndexByAnchor(params: {
   const anchorDate = parseYmdToUtcDate(anchorDateYmd);
 
   const targetUtc = new Date(Date.UTC(
-    targetDate.getUTCFullYear(),
-    targetDate.getUTCMonth(),
-    targetDate.getUTCDate()
+    targetDate.getFullYear(),
+    targetDate.getMonth(),
+    targetDate.getDate()
   ));
 
   const dayDiff = diffDaysUtc(targetUtc, anchorDate);
